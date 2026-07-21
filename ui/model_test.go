@@ -82,36 +82,70 @@ func TestWindowSizeRendersAndIndexes(t *testing.T) {
 	if m.offset != 0 {
 		t.Fatalf("initial offset = %d, want 0", m.offset)
 	}
+	if m.cursor != 0 {
+		t.Fatalf("initial cursor = %d", m.cursor)
+	}
 }
 
-func TestScrollKeys(t *testing.T) {
+func TestCursorKeys(t *testing.T) {
 	m := newTestModel(t, longDoc)
 	vh := m.viewHeight()
 
 	m = press(m, key("j"))
-	if m.offset != 1 {
-		t.Fatalf("after j: offset = %d, want 1", m.offset)
+	if m.cursor != 1 || m.offset != 0 {
+		t.Fatalf("after j: cursor=%d offset=%d, want cursor=1 offset=0", m.cursor, m.offset)
 	}
 	m = press(m, key("k"), key("k")) // clamps at 0
-	if m.offset != 0 {
-		t.Fatalf("after k k: offset = %d, want 0", m.offset)
+	if m.cursor != 0 {
+		t.Fatalf("after k k: cursor = %d, want 0", m.cursor)
 	}
 	m = press(m, tea.KeyMsg{Type: tea.KeyCtrlD})
-	if m.offset != vh/2 {
-		t.Fatalf("after ctrl+d: offset = %d, want %d", m.offset, vh/2)
+	if m.cursor != vh/2 {
+		t.Fatalf("after ctrl+d: cursor = %d, want %d", m.cursor, vh/2)
 	}
 	m = press(m, tea.KeyMsg{Type: tea.KeyCtrlU})
-	if m.offset != 0 {
-		t.Fatalf("after ctrl+u: offset = %d, want 0", m.offset)
+	if m.cursor != 0 {
+		t.Fatalf("after ctrl+u: cursor = %d, want 0", m.cursor)
 	}
-	maxOffset := len(m.lines) - vh
 	m = press(m, key("G"))
-	if m.offset != maxOffset {
-		t.Fatalf("after G: offset = %d, want %d", m.offset, maxOffset)
+	if m.cursor != len(m.lines)-1 {
+		t.Fatalf("after G: cursor = %d, want %d", m.cursor, len(m.lines)-1)
+	}
+	if m.offset != len(m.lines)-vh {
+		t.Fatalf("after G: offset = %d, want %d", m.offset, len(m.lines)-vh)
 	}
 	m = press(m, key("g"), key("g"))
+	if m.cursor != 0 || m.offset != 0 {
+		t.Fatalf("after gg: cursor=%d offset=%d", m.cursor, m.offset)
+	}
+}
+
+func TestScrollOnlyAtMargin(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	vh := m.viewHeight()
+	edge := vh - 1 - scrolloff // last cursor row before scrolling starts
+	for i := 0; i < edge; i++ {
+		m = press(m, key("j"))
+	}
 	if m.offset != 0 {
-		t.Fatalf("after gg: offset = %d, want 0", m.offset)
+		t.Fatalf("offset moved too early: %d (cursor %d)", m.offset, m.cursor)
+	}
+	m = press(m, key("j"))
+	if m.offset != 1 {
+		t.Fatalf("offset should scroll by 1 at margin, got %d", m.offset)
+	}
+}
+
+func TestJumpKeepsScrolloff(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	last := m.index.Headings[len(m.index.Headings)-1].Line
+	m = press(m, key("]"), key("]"), key("]"), key("]"), key("]"), key("]"),
+		key("]"), key("]"), key("]"), key("]")) // jump through all headings
+	if m.cursor < last {
+		t.Fatalf("cursor = %d, want at last heading %d", m.cursor, last)
+	}
+	if m.cursor-m.offset > m.viewHeight()-1 {
+		t.Fatal("cursor left the viewport")
 	}
 }
 
@@ -141,26 +175,26 @@ func TestHeadingJumps(t *testing.T) {
 	}
 
 	m = press(m, key("]"), key("]")) // from line 0 → first heading
-	if m.offset != first {
-		t.Fatalf("after ]]: offset = %d, want %d (headings: %+v)", m.offset, first, m.index.Headings)
+	if m.cursor != first {
+		t.Fatalf("after ]]: cursor = %d, want %d (headings: %+v)", m.cursor, first, m.index.Headings)
 	}
 	m = press(m, key("]"), key("]")) // → second heading
-	if m.offset != second {
-		t.Fatalf("after ]] ]]: offset = %d, want %d", m.offset, second)
+	if m.cursor != second {
+		t.Fatalf("after ]] ]]: cursor = %d, want %d", m.cursor, second)
 	}
 	m = press(m, key("["), key("[")) // back → first heading
-	if m.offset != first {
-		t.Fatalf("after [[: offset = %d, want %d", m.offset, first)
+	if m.cursor != first {
+		t.Fatalf("after [[: cursor = %d, want %d", m.cursor, first)
 	}
 }
 
 func TestHeadingJumpAtBottomIsNoop(t *testing.T) {
 	m := newTestModel(t, longDoc)
 	m = press(m, key("G"))
-	before := m.offset
+	before := m.cursor
 	m = press(m, key("]"), key("]"))
-	if m.offset != before {
-		t.Fatalf("]] past last heading moved offset %d -> %d", before, m.offset)
+	if m.cursor != before {
+		t.Fatalf("]] past last heading moved cursor %d -> %d", before, m.cursor)
 	}
 }
 
@@ -178,16 +212,16 @@ func TestTOCJump(t *testing.T) {
 	if m.mode != modeReading {
 		t.Fatal("enter should return to reading mode")
 	}
-	if m.offset != m.index.Headings[2].Line {
-		t.Fatalf("offset = %d, want heading 2 line %d", m.offset, m.index.Headings[2].Line)
+	if m.cursor != m.index.Headings[2].Line {
+		t.Fatalf("cursor = %d, want heading 2 line %d", m.cursor, m.index.Headings[2].Line)
 	}
 }
 
 func TestTOCEscCloses(t *testing.T) {
 	m := newTestModel(t, longDoc)
-	before := m.offset
+	before := m.cursor
 	m = press(m, key("t"), tea.KeyMsg{Type: tea.KeyEsc})
-	if m.mode != modeReading || m.offset != before {
+	if m.mode != modeReading || m.cursor != before {
 		t.Fatal("esc should close TOC without jumping")
 	}
 }
@@ -216,8 +250,8 @@ func TestSearchJumpsToMatch(t *testing.T) {
 	if len(m.matches) != 1 {
 		t.Fatalf("matches = %v, want exactly 1 (longDoc has one 'alpha')", m.matches)
 	}
-	if m.offset != m.matches[0] {
-		t.Fatalf("offset = %d, want match line %d", m.offset, m.matches[0])
+	if m.cursor != m.matches[0] {
+		t.Fatalf("cursor = %d, want match line %d", m.cursor, m.matches[0])
 	}
 }
 
@@ -240,12 +274,12 @@ func TestSearchWrapsWithN(t *testing.T) {
 
 func TestSearchNoMatches(t *testing.T) {
 	m := newTestModel(t, longDoc)
-	before := m.offset
+	before := m.cursor
 	m = press(m, key("/"))
 	m = typeString(m, "zebra")
 	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.offset != before {
-		t.Fatal("no-match search should not move offset")
+	if m.cursor != before {
+		t.Fatal("no-match search should not move cursor")
 	}
 	if !strings.Contains(m.statusLine(), "no matches") {
 		t.Fatalf("status = %q, want no-matches message", m.statusLine())
@@ -388,8 +422,8 @@ func TestFollowMarkdownLinkLoadsInPlace(t *testing.T) {
 	if !strings.Contains(doc.StripANSI(m.View()), "Other Doc") {
 		t.Fatal("view should show the followed document")
 	}
-	if m.offset != 0 {
-		t.Fatalf("offset = %d, want 0 after following", m.offset)
+	if m.cursor != 0 {
+		t.Fatalf("cursor = %d, want 0 after following", m.cursor)
 	}
 }
 

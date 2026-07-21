@@ -27,6 +27,10 @@ const (
 	modeTOC
 )
 
+// scrolloff is the vim-style margin: the viewport scrolls once the cursor
+// gets within this many lines of an edge.
+const scrolloff = 3
+
 type Model struct {
 	path   string
 	source []byte
@@ -38,6 +42,7 @@ type Model struct {
 
 	mode    mode
 	offset  int
+	cursor  int
 	pending string // first key of two-key sequences: g, ], [
 
 	searchInput string
@@ -143,10 +148,10 @@ func (m *Model) applyRender(lines []string, ix doc.Index) {
 		m.matches = search.Find(m.lines, m.query)
 		m.matchIdx = -1
 		if len(m.matches) > 0 {
-			m.selectMatchNear(m.offset) // keep the reader near their match
+			m.selectMatchNear(m.cursor) // keep the reader near their match
 		}
 	}
-	m.clamp()
+	m.ensureVisible()
 }
 
 func (m Model) viewHeight() int {
@@ -169,6 +174,36 @@ func (m *Model) clamp() {
 	}
 }
 
+func (m *Model) clampCursor() {
+	if m.cursor > len(m.lines)-1 {
+		m.cursor = len(m.lines) - 1
+	}
+	if m.cursor < 0 {
+		m.cursor = 0
+	}
+}
+
+// ensureVisible scrolls the minimum needed to keep the cursor within
+// scrolloff lines of the viewport edges.
+func (m *Model) ensureVisible() {
+	m.clampCursor()
+	vh := m.viewHeight()
+	if vh <= 0 || len(m.lines) == 0 {
+		return
+	}
+	off := scrolloff
+	if vh <= 2*off {
+		off = (vh - 1) / 2
+	}
+	if m.cursor < m.offset+off {
+		m.offset = m.cursor - off
+	}
+	if m.cursor > m.offset+vh-1-off {
+		m.offset = m.cursor - vh + 1 + off
+	}
+	m.clamp()
+}
+
 func (m Model) updateReading(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	keyStr := msg.String()
 	pending := m.pending
@@ -178,37 +213,37 @@ func (m Model) updateReading(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "ctrl+c":
 		return m, tea.Quit
 	case "j", "down":
-		m.offset++
+		m.cursor++
 	case "k", "up":
-		m.offset--
+		m.cursor--
 	case "ctrl+d":
-		m.offset += m.viewHeight() / 2
+		m.cursor += m.viewHeight() / 2
 	case "ctrl+u":
-		m.offset -= m.viewHeight() / 2
+		m.cursor -= m.viewHeight() / 2
 	case "ctrl+f", " ":
-		m.offset += m.viewHeight()
+		m.cursor += m.viewHeight()
 	case "ctrl+b":
-		m.offset -= m.viewHeight()
+		m.cursor -= m.viewHeight()
 	case "g":
 		if pending == "g" {
-			m.offset = 0
+			m.cursor = 0
 		} else {
 			m.pending = "g"
 		}
 	case "G":
-		m.offset = len(m.lines)
+		m.cursor = len(m.lines) - 1
 	case "]":
 		if pending == "]" {
-			if ln := m.index.NextHeading(m.offset); ln >= 0 {
-				m.offset = ln
+			if ln := m.index.NextHeading(m.cursor); ln >= 0 {
+				m.cursor = ln
 			}
 		} else {
 			m.pending = "]"
 		}
 	case "[":
 		if pending == "[" {
-			if ln := m.index.PrevHeading(m.offset); ln >= 0 {
-				m.offset = ln
+			if ln := m.index.PrevHeading(m.cursor); ln >= 0 {
+				m.cursor = ln
 			}
 		} else {
 			m.pending = "["
@@ -235,7 +270,7 @@ func (m Model) updateReading(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.matches = nil
 		m.matchIdx = -1
 	}
-	m.clamp()
+	m.ensureVisible()
 	return m, nil
 }
 
@@ -254,9 +289,9 @@ func (m *Model) jumpMatch(dir int) {
 	} else {
 		m.matchIdx = ((m.matchIdx+dir)%n + n) % n
 	}
-	m.offset = m.matches[m.matchIdx]
+	m.cursor = m.matches[m.matchIdx]
 	m.status = fmt.Sprintf("match %d/%d", m.matchIdx+1, n)
-	m.clamp()
+	m.ensureVisible()
 }
 
 func (m *Model) cycleLink(dir int) {
@@ -275,11 +310,9 @@ func (m *Model) cycleLink(dir int) {
 		m.linkIdx = ((m.linkIdx+dir)%n + n) % n
 	}
 	link := m.index.Links[m.linkIdx]
-	if link.Line < m.offset || link.Line >= m.offset+m.viewHeight() {
-		m.offset = link.Line
-	}
+	m.cursor = link.Line
 	m.status = link.URL
-	m.clamp()
+	m.ensureVisible()
 }
 
 // openBrowser is a package var so tests can stub it.
@@ -319,6 +352,7 @@ func (m Model) followLink() (tea.Model, tea.Cmd) {
 	m.path = target
 	m.source = src
 	m.offset = 0
+	m.cursor = 0
 	m.query = ""
 	m.matches = nil
 	m.matchIdx = -1
@@ -361,11 +395,11 @@ func (m *Model) commitSearch() {
 		m.status = "no matches: " + m.query
 		return
 	}
-	m.selectMatchNear(m.offset)
+	m.selectMatchNear(m.cursor)
 }
 
 // selectMatchNear implements the vim behavior of jumping to the first match at
-// or after line, wrapping to the top match, and moves the viewport there.
+// or after line, wrapping to the top match, and moves the cursor there.
 // Requires len(m.matches) > 0.
 func (m *Model) selectMatchNear(line int) {
 	m.matchIdx = -1
@@ -378,9 +412,9 @@ func (m *Model) selectMatchNear(line int) {
 	if m.matchIdx < 0 {
 		m.matchIdx = 0 // wrap to top
 	}
-	m.offset = m.matches[m.matchIdx]
+	m.cursor = m.matches[m.matchIdx]
 	m.status = fmt.Sprintf("match %d/%d", m.matchIdx+1, len(m.matches))
-	m.clamp()
+	m.ensureVisible()
 }
 
 func (m Model) updateTOC(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -399,8 +433,8 @@ func (m Model) updateTOC(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter":
 		if len(m.index.Headings) > 0 {
-			m.offset = m.index.Headings[m.tocIdx].Line
-			m.clamp()
+			m.cursor = m.index.Headings[m.tocIdx].Line
+			m.ensureVisible()
 		}
 		m.mode = modeReading
 	}
@@ -459,8 +493,8 @@ func (m Model) statusLine() string {
 		return m.spinnerLabel()
 	}
 	pct := 100
-	if max := len(m.lines) - m.viewHeight(); max > 0 {
-		pct = m.offset * 100 / max
+	if len(m.lines) > 1 {
+		pct = m.cursor * 100 / (len(m.lines) - 1)
 	}
 	left := m.status
 	if left == "" {
