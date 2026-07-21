@@ -25,9 +25,21 @@ func Find(lines []string, query string) []int {
 
 // Highlight wraps the first case-insensitive occurrence of query in raw (an
 // ANSI-styled line) with reverse video. Returns raw unchanged if no match.
-// ponytail: a [0m reset inside the match region cancels the reverse video
-// mid-match — acceptable; fix with full SGR state tracking if it ever matters.
 func Highlight(raw, query string) string {
+	return highlight(raw, query, "\x1b[7m", "\x1b[27m")
+}
+
+// HighlightStyled is Highlight with a caller-chosen SGR open sequence
+// (e.g. a theme background color). The close resets reverse and background.
+func HighlightStyled(raw, query, open string) string {
+	return highlight(raw, query, open, "\x1b[27m\x1b[49m")
+}
+
+// highlight wraps the first case-insensitive occurrence of query in raw with
+// the given SGR open/close sequences. Returns raw unchanged if no match.
+// ponytail: a [0m reset inside the match region cancels the open sequence
+// mid-match — acceptable; fix with full SGR state tracking if it ever matters.
+func highlight(raw, query, open, close string) string {
 	if query == "" {
 		return raw
 	}
@@ -56,7 +68,7 @@ func Highlight(raw, query string) string {
 	_, w := utf8.DecodeRuneInString(stripped[lastStripped:])
 	start := byteMap[startStripped]
 	end := byteMap[lastStripped+w-1] + 1
-	return raw[:start] + "\x1b[7m" + raw[start:end] + "\x1b[27m" + raw[end:]
+	return raw[:start] + open + raw[start:end] + close + raw[end:]
 }
 
 // stripWithMap strips ANSI codes and returns, for each byte of the stripped

@@ -239,7 +239,7 @@ func TestSearchJumpsToMatch(t *testing.T) {
 	if m.mode != modeSearchInput {
 		t.Fatal("/ should enter search input mode")
 	}
-	if !strings.HasPrefix(m.statusLine(), "/") {
+	if !strings.Contains(m.statusLine(), "/") {
 		t.Fatalf("status line should echo search input, got %q", m.statusLine())
 	}
 	m = typeString(m, "alpha")
@@ -291,8 +291,8 @@ func TestSearchHighlightInView(t *testing.T) {
 	m = press(m, key("/"))
 	m = typeString(m, "alpha")
 	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if !strings.Contains(m.View(), "\x1b[7m") {
-		t.Fatal("view should contain reverse-video highlight for current match")
+	if !strings.Contains(m.View(), "\x1b[48;2;") {
+		t.Fatal("view should contain themed background highlight for current match")
 	}
 }
 
@@ -351,7 +351,7 @@ func TestResizeKeepsSearchMatch(t *testing.T) {
 	if ml := m.matches[m.matchIdx]; ml < m.offset || ml >= m.offset+m.viewHeight() {
 		t.Fatalf("match line %d not visible in window [%d, %d)", ml, m.offset, m.offset+m.viewHeight())
 	}
-	if !strings.Contains(m.View(), "\x1b[7m") {
+	if !strings.Contains(m.View(), "\x1b[48;2;") {
 		t.Fatal("match highlight should survive resize")
 	}
 }
@@ -478,5 +478,26 @@ func TestStaleRenderDropped(t *testing.T) {
 	}
 	if m.loading {
 		t.Fatal("loading should stay cleared after stale result")
+	}
+}
+
+func TestCursorlineTintOnCursorRow(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("j"), key("j"))
+	rows := strings.Split(m.View(), "\n")
+	cursorRow := rows[m.cursor-m.offset]
+	if !strings.Contains(cursorRow, "\x1b[48;2;") {
+		t.Fatalf("cursor row should carry a background tint: %q", cursorRow)
+	}
+	otherRow := rows[m.cursor-m.offset+1]
+	if strings.Contains(otherRow, "\x1b[48;2;60;56;54m") { // gruvbox-dark cursorline
+		t.Fatalf("non-cursor row should not carry cursorline tint: %q", otherRow)
+	}
+}
+
+func TestStatusLineThemed(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	if !strings.Contains(m.statusLine(), "\x1b[") {
+		t.Fatal("status line should be styled")
 	}
 }

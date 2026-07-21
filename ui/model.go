@@ -12,6 +12,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/muesli/termenv"
 
 	"github.com/benborla/xMarkdown/doc"
 	"github.com/benborla/xMarkdown/render"
@@ -441,6 +442,27 @@ func (m Model) updateTOC(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// hexSeq converts "#rrggbb" to an SGR sequence; bg selects background.
+// ponytail: truecolor assumed — 256/16-color terminals get approximations
+// from the terminal itself or raw truecolor codes; degrade via termenv if
+// anyone complains.
+func hexSeq(hex string, bg bool) string {
+	c := termenv.RGBColor(hex)
+	return "\x1b[" + c.Sequence(bg) + "m"
+}
+
+// cursorlineify tints a full row: sets the background up front, re-applies it
+// after every SGR reset inside the line, and pads to the viewport width.
+func (m Model) cursorlineify(line string) string {
+	bg := hexSeq(m.theme.UI.CursorlineBG, true)
+	s := bg + strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+bg)
+	pad := m.width - len([]rune(doc.StripANSI(line)))
+	if pad > 0 {
+		s += strings.Repeat(" ", pad)
+	}
+	return s + "\x1b[0m"
+}
+
 func (m Model) View() string {
 	if m.mode == modeTOC {
 		return m.viewTOC()
@@ -468,10 +490,13 @@ func (m Model) View() string {
 	for i := m.offset; i < end; i++ {
 		line := m.lines[i]
 		if m.matchIdx >= 0 && m.matchIdx < len(m.matches) && i == m.matches[m.matchIdx] {
-			line = search.Highlight(line, m.query)
+			line = search.HighlightStyled(line, m.query, hexSeq(m.theme.UI.SearchBG, true))
 		}
 		if i == linkLine {
 			line = search.Highlight(line, linkText)
+		}
+		if i == m.cursor {
+			line = m.cursorlineify(line)
 		}
 		visible = append(visible, line)
 	}
@@ -486,21 +511,27 @@ func (m Model) spinnerLabel() string {
 }
 
 func (m Model) statusLine() string {
-	if m.mode == modeSearchInput {
-		return "/" + m.searchInput
+	var content string
+	switch {
+	case m.mode == modeSearchInput:
+		content = "/" + m.searchInput
+	case m.loading:
+		content = m.spinnerLabel()
+	default:
+		pct := 100
+		if len(m.lines) > 1 {
+			pct = m.cursor * 100 / (len(m.lines) - 1)
+		}
+		left := m.status
+		if left == "" {
+			left = m.path
+		}
+		content = fmt.Sprintf("%s  %d%%", left, pct)
 	}
-	if m.loading {
-		return m.spinnerLabel()
+	if pad := m.width - len([]rune(content)); pad > 0 {
+		content += strings.Repeat(" ", pad)
 	}
-	pct := 100
-	if len(m.lines) > 1 {
-		pct = m.cursor * 100 / (len(m.lines) - 1)
-	}
-	left := m.status
-	if left == "" {
-		left = m.path
-	}
-	return fmt.Sprintf("%s  %d%%", left, pct)
+	return hexSeq(m.theme.UI.StatusFG, false) + hexSeq(m.theme.UI.StatusBG, true) + content + "\x1b[0m"
 }
 
 func (m Model) viewTOC() string {
@@ -510,11 +541,12 @@ func (m Model) viewTOC() string {
 		b.WriteString("  (no headings)\n")
 	}
 	for i, h := range m.index.Headings {
-		cursor := "  "
+		row := strings.Repeat("  ", h.Level-1) + h.Text
 		if i == m.tocIdx {
-			cursor = "> "
+			b.WriteString(hexSeq(m.theme.UI.TOCSelectedFG, false) + "> " + row + "\x1b[0m\n")
+		} else {
+			b.WriteString("  " + row + "\n")
 		}
-		b.WriteString(cursor + strings.Repeat("  ", h.Level-1) + h.Text + "\n")
 	}
 	b.WriteString("\n[enter] jump  [esc] close")
 	return b.String()

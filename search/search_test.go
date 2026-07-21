@@ -95,3 +95,11 @@ func TestHighlightMultibyteQueryOnStyledLine(t *testing.T) {
 		t.Fatalf("Highlight = %q, want %q", got, want)
 	}
 }
+
+func TestHighlightStyledCustomSequence(t *testing.T) {
+	got := HighlightStyled("hello world", "world", "\x1b[48;2;215;153;33m")
+	want := "hello \x1b[48;2;215;153;33mworld\x1b[27m\x1b[49m"
+	if got != want {
+		t.Fatalf("HighlightStyled = %q, want %q", got, want)
+	}
+}
