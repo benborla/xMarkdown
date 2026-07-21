@@ -1,4 +1,4 @@
-module xmd
+module github.com/benborla/xMarkdown
 
 go 1.26.5
 

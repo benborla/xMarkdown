@@ -7,8 +7,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"golang.org/x/term"
 
-	"xmd/render"
-	"xmd/ui"
+	"github.com/benborla/xMarkdown/render"
+	"github.com/benborla/xMarkdown/ui"
 )
 
 func main() {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"xmd/doc"
+	"github.com/benborla/xMarkdown/doc"
 )
 
 func TestRenderSmoke(t *testing.T) {

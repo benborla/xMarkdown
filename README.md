@@ -9,15 +9,17 @@ keyboard.
 
 ## Install
 
+Grab a binary from [releases](https://github.com/benborla/xMarkdown/releases), or:
+
 ```sh
-go install xmd@latest
+go install github.com/benborla/xMarkdown@latest   # installs as `xMarkdown`
 ```
 
 Or build from source:
 
 ```sh
-git clone <repo-url>
-cd xmd
+git clone https://github.com/benborla/xMarkdown.git
+cd xMarkdown
 go build -o xmd .
 ```
 

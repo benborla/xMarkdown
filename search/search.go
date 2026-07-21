@@ -7,7 +7,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"xmd/doc"
+	"github.com/benborla/xMarkdown/doc"
 )
 
 // Find returns line numbers whose ANSI-stripped text contains query

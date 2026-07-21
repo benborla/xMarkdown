@@ -13,9 +13,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"xmd/doc"
-	"xmd/render"
-	"xmd/search"
+	"github.com/benborla/xMarkdown/doc"
+	"github.com/benborla/xMarkdown/render"
+	"github.com/benborla/xMarkdown/search"
 )
 
 type mode int
