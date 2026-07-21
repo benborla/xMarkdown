@@ -59,7 +59,7 @@ into styled terminal lines; [goldmark](https://github.com/yuin/goldmark)
 parses the same source into an AST to extract headings and links, which are
 matched against the rendered output to build a jump index. A
 [Bubble Tea](https://github.com/charmbracelet/bubbletea) loop drives the
-viewport. Design notes live in [docs/superpowers/specs/](docs/superpowers/specs/).
+viewport.
 
 ## Contributing
 

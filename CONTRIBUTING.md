@@ -23,8 +23,6 @@ Requires Go 1.21+. No other tooling needed.
 | `doc/` | Goldmark AST extraction + matching anchors to rendered lines |
 | `search/` | Query matching and ANSI-aware highlighting |
 
-The design spec is in `docs/superpowers/specs/`; read it before larger changes.
-
 ## Making changes
 
 1. Fork and create a feature branch off `main`.
