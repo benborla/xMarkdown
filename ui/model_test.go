@@ -252,6 +252,41 @@ func TestSearchEscCancels(t *testing.T) {
 	}
 }
 
+func TestSearchEmptyCommitIsNoop(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	before := m.offset
+	m = press(m, key("/"), tea.KeyMsg{Type: tea.KeyEnter})
+	if m.mode != modeReading {
+		t.Fatal("enter should leave search input mode")
+	}
+	if len(m.matches) != 0 || m.query != "" || m.matchIdx != -1 {
+		t.Fatalf("empty commit set search state: query=%q matches=%v matchIdx=%d",
+			m.query, m.matches, m.matchIdx)
+	}
+	if m.offset != before {
+		t.Fatalf("empty commit moved offset %d -> %d", before, m.offset)
+	}
+}
+
+func TestResizeKeepsSearchMatch(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("/"))
+	m = typeString(m, "alpha")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
+	m = press(m, tea.WindowSizeMsg{Width: 60, Height: 12})
+	if m.matchIdx < 0 {
+		t.Fatalf("resize dropped current match: matchIdx = %d, matches = %v", m.matchIdx, m.matches)
+	}
+	// clamp may pull offset below the match line near the end of the doc;
+	// the contract is that the selected match stays visible.
+	if ml := m.matches[m.matchIdx]; ml < m.offset || ml >= m.offset+m.viewHeight() {
+		t.Fatalf("match line %d not visible in window [%d, %d)", ml, m.offset, m.offset+m.viewHeight())
+	}
+	if !strings.Contains(m.View(), "\x1b[7m") {
+		t.Fatal("match highlight should survive resize")
+	}
+}
+
 const linkDoc = `# Links
 
 Visit [example](https://example.com) or read [other](other.md).

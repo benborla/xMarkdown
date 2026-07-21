@@ -90,6 +90,9 @@ func (m *Model) reflow() {
 	if m.query != "" {
 		m.matches = search.Find(m.lines, m.query)
 		m.matchIdx = -1
+		if len(m.matches) > 0 {
+			m.selectMatchNear(m.offset) // keep the reader near their match
+		}
 	}
 	m.clamp()
 }
@@ -293,6 +296,9 @@ func (m Model) updateSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) commitSearch() {
+	if m.searchInput == "" {
+		return // empty query would match every line
+	}
 	m.query = m.searchInput
 	m.matches = search.Find(m.lines, m.query)
 	m.matchIdx = -1
@@ -300,9 +306,16 @@ func (m *Model) commitSearch() {
 		m.status = "no matches: " + m.query
 		return
 	}
-	// vim behavior: jump to first match at or after the current position
+	m.selectMatchNear(m.offset)
+}
+
+// selectMatchNear implements the vim behavior of jumping to the first match at
+// or after line, wrapping to the top match, and moves the viewport there.
+// Requires len(m.matches) > 0.
+func (m *Model) selectMatchNear(line int) {
+	m.matchIdx = -1
 	for i, ln := range m.matches {
-		if ln >= m.offset {
+		if ln >= line {
 			m.matchIdx = i
 			break
 		}
