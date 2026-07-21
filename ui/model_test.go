@@ -109,3 +109,63 @@ func TestQuitKeys(t *testing.T) {
 		t.Fatal("q should return tea.Quit")
 	}
 }
+
+func TestHeadingJumps(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	first := m.index.Headings[0].Line
+	second := m.index.Headings[1].Line
+	if first <= 0 {
+		t.Fatalf("expected glamour top padding to place first heading below line 0, got %d", first)
+	}
+
+	m = press(m, key("]"), key("]")) // from line 0 → first heading
+	if m.offset != first {
+		t.Fatalf("after ]]: offset = %d, want %d (headings: %+v)", m.offset, first, m.index.Headings)
+	}
+	m = press(m, key("]"), key("]")) // → second heading
+	if m.offset != second {
+		t.Fatalf("after ]] ]]: offset = %d, want %d", m.offset, second)
+	}
+	m = press(m, key("["), key("[")) // back → first heading
+	if m.offset != first {
+		t.Fatalf("after [[: offset = %d, want %d", m.offset, first)
+	}
+}
+
+func TestHeadingJumpAtBottomIsNoop(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("G"))
+	before := m.offset
+	m = press(m, key("]"), key("]"))
+	if m.offset != before {
+		t.Fatalf("]] past last heading moved offset %d -> %d", before, m.offset)
+	}
+}
+
+func TestTOCJump(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("t"))
+	if m.mode != modeTOC {
+		t.Fatal("t should enter TOC mode")
+	}
+	view := m.View()
+	if !strings.Contains(view, "Table of Contents") {
+		t.Fatalf("TOC view missing title:\n%s", view)
+	}
+	m = press(m, key("j"), key("j"), tea.KeyMsg{Type: tea.KeyEnter})
+	if m.mode != modeReading {
+		t.Fatal("enter should return to reading mode")
+	}
+	if m.offset != m.index.Headings[2].Line {
+		t.Fatalf("offset = %d, want heading 2 line %d", m.offset, m.index.Headings[2].Line)
+	}
+}
+
+func TestTOCEscCloses(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	before := m.offset
+	m = press(m, key("t"), tea.KeyMsg{Type: tea.KeyEsc})
+	if m.mode != modeReading || m.offset != before {
+		t.Fatal("esc should close TOC without jumping")
+	}
+}
