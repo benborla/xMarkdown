@@ -4,6 +4,8 @@ package search
 
 import (
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"xmd/doc"
 )
@@ -30,12 +32,30 @@ func Highlight(raw, query string) string {
 		return raw
 	}
 	stripped, byteMap := stripWithMap(raw)
-	idx := strings.Index(strings.ToLower(stripped), strings.ToLower(query))
+	// Lowercasing can change a rune's byte length (e.g. Ⱥ U+023A is 2 bytes,
+	// ⱥ U+2C65 is 3; İ U+0130 is 2, i is 1), so an index into the lowered
+	// string cannot be used on stripped directly. Build the lowered string
+	// rune-by-rune alongside a map from each lowered byte to the stripped
+	// byte offset of the rune it came from.
+	var low strings.Builder
+	var lowMap []int
+	for bi, r := range stripped {
+		lr := unicode.ToLower(r)
+		for j := 0; j < utf8.RuneLen(lr); j++ {
+			lowMap = append(lowMap, bi)
+		}
+		low.WriteRune(lr)
+	}
+	lq := strings.ToLower(query)
+	idx := strings.Index(low.String(), lq)
 	if idx < 0 {
 		return raw
 	}
-	start := byteMap[idx]
-	end := byteMap[idx+len(query)-1] + 1
+	startStripped := lowMap[idx]
+	lastStripped := lowMap[idx+len(lq)-1]
+	_, w := utf8.DecodeRuneInString(stripped[lastStripped:])
+	start := byteMap[startStripped]
+	end := byteMap[lastStripped+w-1] + 1
 	return raw[:start] + "\x1b[7m" + raw[start:end] + "\x1b[27m" + raw[end:]
 }
 
