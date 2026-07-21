@@ -16,6 +16,7 @@ import (
 	"github.com/benborla/xMarkdown/doc"
 	"github.com/benborla/xMarkdown/render"
 	"github.com/benborla/xMarkdown/search"
+	"github.com/benborla/xMarkdown/theme"
 )
 
 type mode int
@@ -29,6 +30,7 @@ const (
 type Model struct {
 	path   string
 	source []byte
+	theme  theme.Theme
 
 	width, height int
 	lines         []string
@@ -69,8 +71,8 @@ func spinTick() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg { return spinTickMsg{} })
 }
 
-func New(path string, source []byte) Model {
-	return Model{path: path, source: source, linkIdx: -1, matchIdx: -1}
+func New(path string, source []byte, th theme.Theme) Model {
+	return Model{path: path, source: source, theme: th, linkIdx: -1, matchIdx: -1}
 }
 
 func (m Model) Init() tea.Cmd { return nil }
@@ -118,10 +120,10 @@ func (m *Model) startRender() tea.Cmd {
 	}
 	m.loading = true
 	m.renderSeq++
-	seq, src, w := m.renderSeq, m.source, m.width
+	seq, src, w, style := m.renderSeq, m.source, m.width, m.theme.Style
 	return tea.Batch(
 		func() tea.Msg {
-			lines, err := render.Render(src, w)
+			lines, err := render.Render(src, w, style)
 			if err != nil {
 				return renderDoneMsg{seq: seq, err: err}
 			}

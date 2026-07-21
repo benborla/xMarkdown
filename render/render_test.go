@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/benborla/xMarkdown/doc"
+	"github.com/benborla/xMarkdown/theme"
 )
 
 func TestRenderSmoke(t *testing.T) {
-	lines, err := Render([]byte("# Hello\n\nSome *styled* text here.\n"), 80)
+	lines, err := Render([]byte("# Hello\n\nSome *styled* text here.\n"), 80, theme.BuiltinDark().Style)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,11 +26,19 @@ func TestRenderSmoke(t *testing.T) {
 }
 
 func TestRenderEmpty(t *testing.T) {
-	lines, err := Render([]byte(""), 80)
+	lines, err := Render([]byte(""), 80, theme.BuiltinDark().Style)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if lines == nil {
 		t.Fatal("expected non-nil lines for empty input")
+	}
+}
+
+func TestRenderUsesThemeColors(t *testing.T) {
+	dark, _ := Render([]byte("*emph*\n"), 80, theme.BuiltinDark().Style)
+	light, _ := Render([]byte("*emph*\n"), 80, theme.BuiltinLight().Style)
+	if strings.Join(dark, "\n") == strings.Join(light, "\n") {
+		t.Fatal("dark and light themes should style output differently")
 	}
 }

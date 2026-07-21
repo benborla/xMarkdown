@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/benborla/xMarkdown/doc"
+	"github.com/benborla/xMarkdown/theme"
 )
 
 // longDoc renders to well over 10 lines at width 40.
@@ -54,7 +57,7 @@ func run(m Model, cmd tea.Cmd) Model {
 
 func newTestModel(t *testing.T, md string) Model {
 	t.Helper()
-	m := New("test.md", []byte(md))
+	m := New("test.md", []byte(md), theme.BuiltinDark())
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	res := run(nm.(Model), cmd)
 	if len(res.lines) == 0 {
@@ -373,7 +376,7 @@ func TestFollowMarkdownLinkLoadsInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m := New(mainPath, []byte(linkDoc))
+	m := New(mainPath, []byte(linkDoc), theme.BuiltinDark())
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = run(nm.(Model), cmd)
 	// second link is other.md
@@ -382,7 +385,7 @@ func TestFollowMarkdownLinkLoadsInPlace(t *testing.T) {
 	if m.path != filepath.Join(dir, "other.md") {
 		t.Fatalf("path = %q, want other.md loaded", m.path)
 	}
-	if !strings.Contains(m.View(), "Other Doc") {
+	if !strings.Contains(doc.StripANSI(m.View()), "Other Doc") {
 		t.Fatal("view should show the followed document")
 	}
 	if m.offset != 0 {
@@ -396,7 +399,7 @@ func TestFollowMissingFileShowsError(t *testing.T) {
 	if err := os.WriteFile(mainPath, []byte(linkDoc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := New(mainPath, []byte(linkDoc))
+	m := New(mainPath, []byte(linkDoc), theme.BuiltinDark())
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = run(nm.(Model), cmd)
 	m = press(m, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyEnter})
@@ -409,7 +412,7 @@ func TestFollowMissingFileShowsError(t *testing.T) {
 }
 
 func TestLoadingSpinnerShownUntilRenderDone(t *testing.T) {
-	m := New("test.md", []byte(longDoc))
+	m := New("test.md", []byte(longDoc), theme.BuiltinDark())
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = nm.(Model)
 	if !m.loading {
@@ -428,7 +431,7 @@ func TestLoadingSpinnerShownUntilRenderDone(t *testing.T) {
 }
 
 func TestStaleRenderDropped(t *testing.T) {
-	m := New("test.md", []byte(longDoc))
+	m := New("test.md", []byte(longDoc), theme.BuiltinDark())
 	nm, cmd1 := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = nm.(Model)
 	nm, cmd2 := m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})

@@ -8,6 +8,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/benborla/xMarkdown/render"
+	"github.com/benborla/xMarkdown/theme"
 	"github.com/benborla/xMarkdown/ui"
 )
 
@@ -25,7 +26,7 @@ func main() {
 
 	// Piped output: dump rendered markdown, no TUI.
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
-		lines, err := render.Render(source, 80)
+		lines, err := render.Render(source, 80, theme.BuiltinDark().Style)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "xmd:", err)
 			os.Exit(1)
@@ -36,7 +37,7 @@ func main() {
 		return
 	}
 
-	p := tea.NewProgram(ui.New(path, source), tea.WithAltScreen())
+	p := tea.NewProgram(ui.New(path, source, theme.BuiltinDark()), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "xmd:", err)
 		os.Exit(1)

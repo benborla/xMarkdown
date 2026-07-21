@@ -7,10 +7,11 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
-// Render renders markdown to ANSI-styled lines wrapped at width.
-func Render(source []byte, width int) ([]string, error) {
+// Render renders markdown to ANSI-styled lines wrapped at width, using the
+// given glamour style JSON (a theme's Style bytes).
+func Render(source []byte, width int, styleJSON []byte) ([]string, error) {
 	r, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
+		glamour.WithStylesFromJSONBytes(styleJSON),
 		glamour.WithWordWrap(width),
 	)
 	if err != nil {
