@@ -52,7 +52,24 @@ xmd README.md | less -R
 | `Tab` / `Shift-Tab` | cycle link highlight |
 | `Enter` | follow highlighted link (`.md` opens in place, URLs open in browser) |
 | `esc` | dismiss search / overlay / link highlight |
+| `:` | command mode — `:set nu`, `:set rnu`, `:set nonu`, `:theme <name>`, `:q` |
 | `q` / `ctrl-c` | quit |
+
+## Themes & config
+
+xmd ships gruvbox dark and light and picks one automatically from your
+terminal background. Override with `--theme gruvbox-light`, `--theme
+/path/to/theme.json`, or in `~/.config/xmd/config.yaml`:
+
+```yaml
+theme: auto      # auto | gruvbox-dark | gruvbox-light | <custom-name> | /path.json
+numbers: off     # off | absolute | relative
+```
+
+A theme is a single JSON file: a [glamour style](https://github.com/charmbracelet/glamour/tree/master/styles)
+plus an `"xmd"` key for UI chrome (cursorline, line numbers, status bar, TOC,
+search highlight). Drop custom themes in `~/.config/xmd/themes/<name>.json`
+and select them by name. Missing `"xmd"` fields inherit gruvbox defaults.
 
 ## How it works
 
