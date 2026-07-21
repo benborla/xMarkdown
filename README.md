@@ -1,0 +1,70 @@
+# xmd
+
+A vim-navigable markdown reader for the terminal.
+
+Like [Glow](https://github.com/charmbracelet/glow), but instead of passively
+scrolling rendered output, you navigate it: jump between headings, search with
+`/`, pop open a table of contents, and follow links — all without leaving the
+keyboard.
+
+## Install
+
+```sh
+go install xmd@latest
+```
+
+Or build from source:
+
+```sh
+git clone <repo-url>
+cd xmd
+go build -o xmd .
+```
+
+Requires Go 1.21+.
+
+## Usage
+
+```sh
+xmd README.md
+```
+
+Piping works too — renders and exits, no TUI:
+
+```sh
+xmd README.md | less -R
+```
+
+## Keys
+
+| Key | Action |
+|-----|--------|
+| `j` / `k`, arrows | line down / up |
+| `ctrl-d` / `ctrl-u` | half page down / up |
+| `ctrl-f` / `ctrl-b`, `space` | full page down / up |
+| `gg` / `G` | top / bottom |
+| `]]` / `[[` | next / previous heading |
+| `/` | search (case-insensitive), `enter` to run |
+| `n` / `N` | next / previous match |
+| `t` | table of contents — `j`/`k` select, `enter` jump |
+| `Tab` / `Shift-Tab` | cycle link highlight |
+| `Enter` | follow highlighted link (`.md` opens in place, URLs open in browser) |
+| `esc` | dismiss search / overlay / link highlight |
+| `q` / `ctrl-c` | quit |
+
+## How it works
+
+[Glamour](https://github.com/charmbracelet/glamour) renders the whole document
+into styled terminal lines; [goldmark](https://github.com/yuin/goldmark)
+parses the same source into an AST to extract headings and links, which are
+matched against the rendered output to build a jump index. A
+[Bubble Tea](https://github.com/charmbracelet/bubbletea) loop drives the
+viewport. Design notes live in [docs/superpowers/specs/](docs/superpowers/specs/).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)
