@@ -1,0 +1,50 @@
+{
+  "document": { "block_prefix": "\n", "block_suffix": "\n", "color": "#ebdbb2", "margin": 2 },
+  "block_quote": { "color": "#928374", "indent": 1, "indent_token": "│ " },
+  "paragraph": {},
+  "list": { "level_indent": 2 },
+  "heading": { "block_suffix": "\n", "color": "#8ec07c", "bold": true },
+  "h1": { "prefix": " ", "suffix": " ", "color": "#282828", "background_color": "#8ec07c", "bold": true },
+  "h2": { "prefix": "## " },
+  "h3": { "prefix": "### " },
+  "h4": { "prefix": "#### " },
+  "h5": { "prefix": "##### " },
+  "h6": { "prefix": "###### ", "bold": false },
+  "text": {},
+  "strikethrough": { "crossed_out": true },
+  "emph": { "italic": true, "color": "#d3869b" },
+  "strong": { "bold": true, "color": "#fabd2f" },
+  "hr": { "color": "#665c54", "format": "\n────────\n" },
+  "item": { "block_prefix": "• " },
+  "enumeration": { "block_prefix": ". " },
+  "task": { "ticked": "[✓] ", "unticked": "[ ] " },
+  "link": { "color": "#fe8019", "underline": true },
+  "link_text": { "color": "#fabd2f", "bold": true },
+  "image": { "color": "#d3869b", "underline": true },
+  "image_text": { "color": "#928374", "format": "Image: {{.text}} →" },
+  "code": { "color": "#fb4934", "background_color": "#3c3836" },
+  "code_block": {
+    "color": "#ebdbb2",
+    "margin": 2,
+    "chroma": {
+      "text": { "color": "#ebdbb2" },
+      "keyword": { "color": "#fb4934" },
+      "name_builtin": { "color": "#fabd2f" },
+      "name_function": { "color": "#b8bb26" },
+      "literal_string": { "color": "#b8bb26" },
+      "literal_number": { "color": "#d3869b" },
+      "comment": { "color": "#928374", "italic": true }
+    }
+  },
+  "table": { "center_separator": "┼", "column_separator": "│", "row_separator": "─" },
+  "definition_description": { "block_prefix": "\n→ " },
+  "xmd": {
+    "cursorline_bg": "#3c3836",
+    "linenr_fg": "#7c6f64",
+    "linenr_cursor_fg": "#fabd2f",
+    "status_fg": "#ebdbb2",
+    "status_bg": "#504945",
+    "toc_selected_fg": "#fabd2f",
+    "search_bg": "#d79921"
+  }
+}
