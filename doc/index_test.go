@@ -60,14 +60,14 @@ func TestBuildPositions(t *testing.T) {
 `)
 	// Hand-crafted "rendered" lines (unstyled — StripANSI is a no-op on them).
 	rendered := []string{
-		"",          // 0
-		"  Title",   // 1
-		"",          // 2
+		"",                             // 0
+		"  Title",                      // 1
+		"",                             // 2
 		"  docs (https://example.com)", // 3
-		"",          // 4
-		"  Setup",   // 5
-		"",          // 6
-		"  Setup",   // 7
+		"",                             // 4
+		"  Setup",                      // 5
+		"",                             // 6
+		"  Setup",                      // 7
 	}
 	ix := Build(src, rendered)
 
