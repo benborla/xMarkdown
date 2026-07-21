@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -247,5 +249,94 @@ func TestSearchEscCancels(t *testing.T) {
 	m = press(m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.mode != modeReading || m.query != "" {
 		t.Fatal("esc should cancel search input without committing")
+	}
+}
+
+const linkDoc = `# Links
+
+Visit [example](https://example.com) or read [other](other.md).
+`
+
+func TestLinkCycle(t *testing.T) {
+	m := newTestModel(t, linkDoc)
+	if len(m.index.Links) != 2 {
+		t.Fatalf("links = %+v, want 2", m.index.Links)
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.linkIdx != 0 {
+		t.Fatalf("tab: linkIdx = %d, want 0", m.linkIdx)
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.linkIdx != 1 {
+		t.Fatalf("tab tab: linkIdx = %d, want 1", m.linkIdx)
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.linkIdx != 0 {
+		t.Fatalf("tab wrap: linkIdx = %d, want 0", m.linkIdx)
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyShiftTab})
+	if m.linkIdx != 1 {
+		t.Fatalf("shift+tab: linkIdx = %d, want 1", m.linkIdx)
+	}
+	if !strings.Contains(m.View(), "\x1b[7m") {
+		t.Fatal("highlighted link should appear reverse-video in view")
+	}
+}
+
+func TestFollowURLOpensBrowser(t *testing.T) {
+	opened := ""
+	orig := openBrowser
+	openBrowser = func(url string) error { opened = url; return nil }
+	defer func() { openBrowser = orig }()
+
+	m := newTestModel(t, linkDoc)
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyEnter})
+	if opened != "https://example.com" {
+		t.Fatalf("opened = %q, want https://example.com", opened)
+	}
+}
+
+func TestFollowMarkdownLinkLoadsInPlace(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "other.md"), []byte("# Other Doc\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	mainPath := filepath.Join(dir, "main.md")
+	if err := os.WriteFile(mainPath, []byte(linkDoc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := New(mainPath, []byte(linkDoc))
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	m = nm.(Model)
+	// second link is other.md
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.path != filepath.Join(dir, "other.md") {
+		t.Fatalf("path = %q, want other.md loaded", m.path)
+	}
+	if !strings.Contains(m.View(), "Other Doc") {
+		t.Fatal("view should show the followed document")
+	}
+	if m.offset != 0 {
+		t.Fatalf("offset = %d, want 0 after following", m.offset)
+	}
+}
+
+func TestFollowMissingFileShowsError(t *testing.T) {
+	dir := t.TempDir()
+	mainPath := filepath.Join(dir, "main.md")
+	if err := os.WriteFile(mainPath, []byte(linkDoc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := New(mainPath, []byte(linkDoc))
+	nm, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	m = nm.(Model)
+	m = press(m, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyEnter})
+	if !strings.Contains(m.statusLine(), "cannot open") {
+		t.Fatalf("status = %q, want cannot-open error", m.statusLine())
+	}
+	if m.path != mainPath {
+		t.Fatal("view should stay on original document")
 	}
 }
