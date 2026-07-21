@@ -57,7 +57,7 @@ func run(m Model, cmd tea.Cmd) Model {
 
 func newTestModel(t *testing.T, md string) Model {
 	t.Helper()
-	m := New("test.md", []byte(md), theme.BuiltinDark())
+	m := New("test.md", []byte(md), Options{Theme: theme.BuiltinDark()})
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	res := run(nm.(Model), cmd)
 	if len(res.lines) == 0 {
@@ -440,7 +440,7 @@ func TestFollowMarkdownLinkLoadsInPlace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	m := New(mainPath, []byte(linkDoc), theme.BuiltinDark())
+	m := New(mainPath, []byte(linkDoc), Options{Theme: theme.BuiltinDark()})
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = run(nm.(Model), cmd)
 	// second link is other.md
@@ -463,7 +463,7 @@ func TestFollowMissingFileShowsError(t *testing.T) {
 	if err := os.WriteFile(mainPath, []byte(linkDoc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m := New(mainPath, []byte(linkDoc), theme.BuiltinDark())
+	m := New(mainPath, []byte(linkDoc), Options{Theme: theme.BuiltinDark()})
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = run(nm.(Model), cmd)
 	m = press(m, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyEnter})
@@ -476,7 +476,7 @@ func TestFollowMissingFileShowsError(t *testing.T) {
 }
 
 func TestLoadingSpinnerShownUntilRenderDone(t *testing.T) {
-	m := New("test.md", []byte(longDoc), theme.BuiltinDark())
+	m := New("test.md", []byte(longDoc), Options{Theme: theme.BuiltinDark()})
 	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = nm.(Model)
 	if !m.loading {
@@ -495,7 +495,7 @@ func TestLoadingSpinnerShownUntilRenderDone(t *testing.T) {
 }
 
 func TestStaleRenderDropped(t *testing.T) {
-	m := New("test.md", []byte(longDoc), theme.BuiltinDark())
+	m := New("test.md", []byte(longDoc), Options{Theme: theme.BuiltinDark()})
 	nm, cmd1 := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
 	m = nm.(Model)
 	nm, cmd2 := m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})
@@ -529,5 +529,35 @@ func TestStatusLineThemed(t *testing.T) {
 	m := newTestModel(t, longDoc)
 	if !strings.Contains(m.statusLine(), "\x1b[") {
 		t.Fatal("status line should be styled")
+	}
+}
+
+func TestGutterAbsoluteAndRelative(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m.numbers = NumbersAbsolute
+	rows := strings.Split(m.View(), "\n")
+	first := doc.StripANSI(rows[0])
+	if !strings.HasPrefix(strings.TrimLeft(first, " "), "1 ") {
+		t.Fatalf("absolute gutter should start with 1: %q", first)
+	}
+
+	m.numbers = NumbersRelative
+	m = press(m, key("j"), key("j"))
+	rows = strings.Split(m.View(), "\n")
+	cursorRow := doc.StripANSI(rows[m.cursor-m.offset])
+	if !strings.HasPrefix(strings.TrimLeft(cursorRow, " "), "3 ") {
+		t.Fatalf("relative mode shows absolute number on cursor row: %q", cursorRow)
+	}
+	above := doc.StripANSI(rows[m.cursor-m.offset-1])
+	if !strings.HasPrefix(strings.TrimLeft(above, " "), "1 ") {
+		t.Fatalf("row above cursor should show relative 1: %q", above)
+	}
+}
+
+func TestGutterOffByDefault(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	rows := strings.Split(m.View(), "\n")
+	if strings.HasPrefix(strings.TrimLeft(doc.StripANSI(rows[0]), " "), "1 ") {
+		t.Fatal("gutter must be off by default")
 	}
 }

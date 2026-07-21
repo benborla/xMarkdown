@@ -37,7 +37,7 @@ func main() {
 		return
 	}
 
-	p := tea.NewProgram(ui.New(path, source, theme.BuiltinDark()), tea.WithAltScreen())
+	p := tea.NewProgram(ui.New(path, source, ui.Options{Theme: theme.BuiltinDark()}), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintln(os.Stderr, "xmd:", err)
 		os.Exit(1)

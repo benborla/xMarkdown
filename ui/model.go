@@ -32,6 +32,20 @@ const (
 // gets within this many lines of an edge.
 const scrolloff = 3
 
+// NumberMode selects the line-number gutter style.
+type NumberMode int
+
+const (
+	NumbersOff NumberMode = iota
+	NumbersAbsolute
+	NumbersRelative
+)
+
+// gutterReserve is the content-width reserve when numbers are on.
+// ponytail: fixed 5 cols fits 4-digit line counts; docs rendering to >9999
+// lines overflow the row by the extra digits — widen if that ever matters.
+const gutterReserve = 5
+
 type Model struct {
 	path   string
 	source []byte
@@ -58,7 +72,9 @@ type Model struct {
 	spin      int
 	renderSeq int // tags async renders so stale results are dropped
 
-	status string
+	status  string
+	numbers NumberMode
+	dark    bool
 }
 
 // renderDoneMsg carries the result of an async render.
@@ -77,8 +93,21 @@ func spinTick() tea.Cmd {
 	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg { return spinTickMsg{} })
 }
 
-func New(path string, source []byte, th theme.Theme) Model {
-	return Model{path: path, source: source, theme: th, linkIdx: -1, matchIdx: -1}
+// Options configures the Model at construction time.
+type Options struct {
+	Theme   theme.Theme
+	Numbers NumberMode
+	Dark    bool   // active mode, used by :theme resolution
+	Warning string // initial status message (config/theme load problems)
+}
+
+func New(path string, source []byte, opts Options) Model {
+	return Model{
+		path: path, source: source,
+		theme: opts.Theme, numbers: opts.Numbers, dark: opts.Dark,
+		status:  opts.Warning,
+		linkIdx: -1, matchIdx: -1,
+	}
 }
 
 func (m Model) Init() tea.Cmd { return nil }
@@ -126,7 +155,7 @@ func (m *Model) startRender() tea.Cmd {
 	}
 	m.loading = true
 	m.renderSeq++
-	seq, src, w, style := m.renderSeq, m.source, m.width, m.theme.Style
+	seq, src, w, style := m.renderSeq, m.source, m.width-m.gutterWidth(), m.theme.Style
 	return tea.Batch(
 		func() tea.Msg {
 			lines, err := render.Render(src, w, style)
@@ -451,6 +480,45 @@ func hexSeq(hex string, bg bool) string {
 	return "\x1b[" + c.Sequence(bg) + "m"
 }
 
+func (m Model) gutterWidth() int {
+	if m.numbers == NumbersOff {
+		return 0
+	}
+	w := len(fmt.Sprintf("%d", len(m.lines))) + 1
+	if w < gutterReserve {
+		w = gutterReserve
+	}
+	return w
+}
+
+func (m Model) gutter(i int) string {
+	if m.numbers == NumbersOff {
+		return ""
+	}
+	n := i + 1
+	fg := m.theme.UI.LinenrFG
+	if i == m.cursor {
+		fg = m.theme.UI.LinenrCursorFG // cursor row: absolute number, accent color
+	} else if m.numbers == NumbersRelative {
+		n = i - m.cursor
+		if n < 0 {
+			n = -n
+		}
+	}
+	return fmt.Sprintf("%s%*d\x1b[0m ", hexSeq(fg, false), m.gutterWidth()-1, n)
+}
+
+// setNumbers switches the gutter mode, re-rendering only when the gutter
+// appears or disappears (content width change).
+func (m *Model) setNumbers(n NumberMode) tea.Cmd {
+	wasOn := m.numbers != NumbersOff
+	m.numbers = n
+	if wasOn != (n != NumbersOff) {
+		return m.startRender()
+	}
+	return nil
+}
+
 // cursorlineify tints a full row: sets the background up front, re-applies it
 // after every SGR reset inside the line, and pads to the viewport width.
 func (m Model) cursorlineify(line string) string {
@@ -503,6 +571,7 @@ func (m Model) View() string {
 		if i == linkLine {
 			line = search.Highlight(line, linkText)
 		}
+		line = m.gutter(i) + line
 		if i == m.cursor {
 			line = m.cursorlineify(line)
 		}
