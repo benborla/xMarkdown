@@ -456,6 +456,14 @@ func hexSeq(hex string, bg bool) string {
 func (m Model) cursorlineify(line string) string {
 	bg := hexSeq(m.theme.UI.CursorlineBG, true)
 	s := bg + strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+bg)
+	// Re-apply bg after \x1b[49m (default-background reset emitted by
+	// search.HighlightStyled at the end of each match), so the cursorline
+	// tint is not lost between match-end and row-end.
+	// The injected bg sequences use \x1b[48;2;...m, not \x1b[49m, so there
+	// is no double-processing hazard.
+	s = strings.ReplaceAll(s, "\x1b[49m", "\x1b[49m"+bg)
+	// ponytail: pad counts runes, not cells — CJK double-width rows over-pad;
+	// switch to go-runewidth if that ever matters.
 	pad := m.width - len([]rune(doc.StripANSI(line)))
 	if pad > 0 {
 		s += strings.Repeat(" ", pad)

@@ -296,6 +296,36 @@ func TestSearchHighlightInView(t *testing.T) {
 	}
 }
 
+// TestCursorlineTintAfterSearchMatchReset verifies that the cursorline
+// background is re-applied after the \x1b[49m that search.HighlightStyled
+// emits at the end of each match, so the tint does not drop between the
+// match close and the row end.
+func TestCursorlineTintAfterSearchMatchReset(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("/"))
+	m = typeString(m, "alpha")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
+
+	// The cursor should be on the match row.
+	if len(m.matches) != 1 {
+		t.Fatalf("matches = %v, want exactly 1", m.matches)
+	}
+	if m.cursor != m.matches[0] {
+		t.Fatalf("cursor = %d, want match line %d", m.cursor, m.matches[0])
+	}
+
+	rows := strings.Split(m.View(), "\n")
+	cursorRow := rows[m.cursor-m.offset]
+
+	// The search match ends with \x1b[27m\x1b[49m (reverse off + default bg).
+	// cursorlineify must re-inject the cursorline bg after that \x1b[49m.
+	const wantSeq = "\x1b[49m\x1b[48;2;60;56;54m" // gruvbox-dark cursorline_bg = #3c3836
+	if !strings.Contains(cursorRow, wantSeq) {
+		t.Fatalf("cursorline tint missing after search-match background reset;\n"+
+			"want %q somewhere in row:\n%q", wantSeq, cursorRow)
+	}
+}
+
 func TestSearchEscCancels(t *testing.T) {
 	m := newTestModel(t, longDoc)
 	m = press(m, key("/"))
