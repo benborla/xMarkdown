@@ -169,3 +169,83 @@ func TestTOCEscCloses(t *testing.T) {
 		t.Fatal("esc should close TOC without jumping")
 	}
 }
+
+func typeString(m Model, s string) Model {
+	for _, r := range s {
+		m = press(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+	}
+	return m
+}
+
+func TestSearchJumpsToMatch(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("/"))
+	if m.mode != modeSearchInput {
+		t.Fatal("/ should enter search input mode")
+	}
+	if !strings.HasPrefix(m.statusLine(), "/") {
+		t.Fatalf("status line should echo search input, got %q", m.statusLine())
+	}
+	m = typeString(m, "alpha")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.mode != modeReading {
+		t.Fatal("enter should commit search")
+	}
+	if len(m.matches) != 1 {
+		t.Fatalf("matches = %v, want exactly 1 (longDoc has one 'alpha')", m.matches)
+	}
+	if m.offset != m.matches[0] {
+		t.Fatalf("offset = %d, want match line %d", m.offset, m.matches[0])
+	}
+}
+
+func TestSearchWrapsWithN(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("/"))
+	m = typeString(m, "section")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if len(m.matches) < 2 {
+		t.Fatalf("need multiple matches for wrap test, got %v", m.matches)
+	}
+	start := m.matchIdx
+	for range m.matches {
+		m = press(m, key("n"))
+	}
+	if m.matchIdx != start {
+		t.Fatalf("n should wrap around: idx = %d, want %d", m.matchIdx, start)
+	}
+}
+
+func TestSearchNoMatches(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	before := m.offset
+	m = press(m, key("/"))
+	m = typeString(m, "zebra")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.offset != before {
+		t.Fatal("no-match search should not move offset")
+	}
+	if !strings.Contains(m.statusLine(), "no matches") {
+		t.Fatalf("status = %q, want no-matches message", m.statusLine())
+	}
+}
+
+func TestSearchHighlightInView(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("/"))
+	m = typeString(m, "alpha")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if !strings.Contains(m.View(), "\x1b[7m") {
+		t.Fatal("view should contain reverse-video highlight for current match")
+	}
+}
+
+func TestSearchEscCancels(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("/"))
+	m = typeString(m, "alp")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.mode != modeReading || m.query != "" {
+		t.Fatal("esc should cancel search input without committing")
+	}
+}
