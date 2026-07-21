@@ -50,6 +50,9 @@ func main() {
 
 	// Piped output: dump rendered markdown, no TUI.
 	if !term.IsTerminal(int(os.Stdout.Fd())) {
+		if warning != "" {
+			fmt.Fprintln(os.Stderr, "xmd: "+warning)
+		}
 		lines, err := render.Render(source, 80, th.Style)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "xmd:", err)
