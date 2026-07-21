@@ -26,6 +26,7 @@ const (
 	modeReading mode = iota
 	modeSearchInput
 	modeTOC
+	modeCommand
 )
 
 // scrolloff is the vim-style margin: the viewport scrolls once the cursor
@@ -72,9 +73,10 @@ type Model struct {
 	spin      int
 	renderSeq int // tags async renders so stale results are dropped
 
-	status  string
-	numbers NumberMode
-	dark    bool
+	status   string
+	numbers  NumberMode
+	dark     bool
+	cmdInput string
 }
 
 // renderDoneMsg carries the result of an async render.
@@ -140,6 +142,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateSearchInput(msg)
 		case modeTOC:
 			return m.updateTOC(msg)
+		case modeCommand:
+			return m.updateCommand(msg)
 		default:
 			return m.updateReading(msg)
 		}
@@ -281,6 +285,9 @@ func (m Model) updateReading(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.mode = modeSearchInput
 		m.searchInput = ""
+	case ":":
+		m.mode = modeCommand
+		m.cmdInput = ""
 	case "n":
 		m.jumpMatch(1)
 	case "N":
@@ -471,6 +478,68 @@ func (m Model) updateTOC(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m Model) updateCommand(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.mode = modeReading
+	case "enter":
+		m.mode = modeReading
+		return m.executeCommand(m.cmdInput)
+	case "backspace":
+		if len(m.cmdInput) > 0 {
+			m.cmdInput = m.cmdInput[:len(m.cmdInput)-1]
+		}
+	case "ctrl+c":
+		return m, tea.Quit
+	default:
+		switch msg.Type {
+		case tea.KeyRunes:
+			m.cmdInput += string(msg.Runes)
+		case tea.KeySpace:
+			m.cmdInput += " "
+		}
+	}
+	return m, nil
+}
+
+func (m Model) executeCommand(input string) (tea.Model, tea.Cmd) {
+	fields := strings.Fields(input)
+	if len(fields) == 0 {
+		return m, nil
+	}
+	switch fields[0] {
+	case "q":
+		return m, tea.Quit
+	case "set":
+		if len(fields) == 2 {
+			switch fields[1] {
+			case "nu", "number":
+				cmd := m.setNumbers(NumbersAbsolute)
+				return m, cmd
+			case "rnu", "relativenumber":
+				cmd := m.setNumbers(NumbersRelative)
+				return m, cmd
+			case "nonu", "nonumber":
+				cmd := m.setNumbers(NumbersOff)
+				return m, cmd
+			}
+		}
+	case "theme":
+		if len(fields) == 2 {
+			th, err := theme.Resolve(fields[1], m.dark)
+			if err != nil {
+				m.status = "theme error: " + err.Error()
+				return m, nil
+			}
+			m.theme = th
+			cmd := m.startRender()
+			return m, cmd
+		}
+	}
+	m.status = "E492: not a command: " + input
+	return m, nil
+}
+
 // hexSeq converts "#rrggbb" to an SGR sequence; bg selects background.
 // ponytail: truecolor assumed — 256/16-color terminals get approximations
 // from the terminal itself or raw truecolor codes; degrade via termenv if
@@ -590,6 +659,8 @@ func (m Model) spinnerLabel() string {
 func (m Model) statusLine() string {
 	var content string
 	switch {
+	case m.mode == modeCommand:
+		content = ":" + m.cmdInput
 	case m.mode == modeSearchInput:
 		content = "/" + m.searchInput
 	case m.loading:

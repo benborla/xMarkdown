@@ -561,3 +561,68 @@ func TestGutterOffByDefault(t *testing.T) {
 		t.Fatal("gutter must be off by default")
 	}
 }
+
+func typeCommand(m Model, s string) Model {
+	m = press(m, key(":"))
+	m = typeString(m, s)
+	return press(m, tea.KeyMsg{Type: tea.KeyEnter})
+}
+
+func TestCommandSetNumbers(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = typeCommand(m, "set nu")
+	if m.numbers != NumbersAbsolute {
+		t.Fatalf("after :set nu, numbers = %v", m.numbers)
+	}
+	m = typeCommand(m, "set rnu")
+	if m.numbers != NumbersRelative {
+		t.Fatalf("after :set rnu, numbers = %v", m.numbers)
+	}
+	m = typeCommand(m, "set nonu")
+	if m.numbers != NumbersOff {
+		t.Fatalf("after :set nonu, numbers = %v", m.numbers)
+	}
+}
+
+func TestCommandTheme(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = typeCommand(m, "theme gruvbox-light")
+	if m.theme.Name != "gruvbox-light" {
+		t.Fatalf("theme = %q, want gruvbox-light", m.theme.Name)
+	}
+	m = typeCommand(m, "theme no-such-theme")
+	if m.theme.Name != "gruvbox-light" {
+		t.Fatal("unknown theme must keep current theme")
+	}
+	if !strings.Contains(m.statusLine(), "theme") {
+		t.Fatalf("status should carry the error, got %q", m.statusLine())
+	}
+}
+
+func TestCommandQuit(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key(":"))
+	m = typeString(m, "q")
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if cmd == nil {
+		t.Fatal(":q should quit")
+	}
+}
+
+func TestCommandUnknown(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = typeCommand(m, "wibble")
+	if !strings.Contains(m.statusLine(), "E492") {
+		t.Fatalf("status = %q, want E492", m.statusLine())
+	}
+}
+
+func TestCommandEscCancels(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key(":"))
+	m = typeString(m, "set nu")
+	m = press(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.mode != modeReading || m.numbers != NumbersOff {
+		t.Fatal("esc should cancel without executing")
+	}
+}
