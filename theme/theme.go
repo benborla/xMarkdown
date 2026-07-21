@@ -46,8 +46,19 @@ func DetectDark() bool {
 	return termenv.HasDarkBackground()
 }
 
-func BuiltinDark() Theme  { t, _ := fromBytes("gruvbox-dark", gruvboxDark, true); return t }
-func BuiltinLight() Theme { t, _ := fromBytes("gruvbox-light", gruvboxLight, false); return t }
+// BuiltinDark returns the embedded gruvbox dark theme.
+func BuiltinDark() Theme { return mustBuiltin("gruvbox-dark", gruvboxDark, true) }
+
+// BuiltinLight returns the embedded gruvbox light theme.
+func BuiltinLight() Theme { return mustBuiltin("gruvbox-light", gruvboxLight, false) }
+
+func mustBuiltin(name string, data []byte, dark bool) Theme {
+	t, err := fromBytes(name, data, dark)
+	if err != nil {
+		panic("theme: corrupt embedded " + name + ": " + err.Error())
+	}
+	return t
+}
 
 // Resolve maps a theme spec to a Theme. "" or "auto" picks gruvbox by
 // terminal darkness; a builtin name, a name under <config>/themes/<name>.json,
@@ -97,7 +108,9 @@ func fillDefaults(ui *UI, dark bool) {
 	var def struct {
 		XMD UI `json:"xmd"`
 	}
-	json.Unmarshal(src, &def)
+	if err := json.Unmarshal(src, &def); err != nil {
+		panic("theme: corrupt embedded default: " + err.Error())
+	}
 	d := def.XMD
 	if ui.CursorlineBG == "" {
 		ui.CursorlineBG = d.CursorlineBG
