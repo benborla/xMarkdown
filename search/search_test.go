@@ -23,3 +23,41 @@ func TestFindNoMatch(t *testing.T) {
 		t.Fatalf("Find = %v, want empty", got)
 	}
 }
+
+func TestHighlightPlain(t *testing.T) {
+	got := Highlight("hello world", "world")
+	want := "hello \x1b[7mworld\x1b[27m"
+	if got != want {
+		t.Fatalf("Highlight = %q, want %q", got, want)
+	}
+}
+
+func TestHighlightStyledLine(t *testing.T) {
+	raw := "\x1b[1mHello\x1b[0m world"
+	got := Highlight(raw, "world")
+	want := "\x1b[1mHello\x1b[0m \x1b[7mworld\x1b[27m"
+	if got != want {
+		t.Fatalf("Highlight = %q, want %q", got, want)
+	}
+}
+
+func TestHighlightCaseInsensitive(t *testing.T) {
+	got := Highlight("Hello World", "world")
+	want := "Hello \x1b[7mWorld\x1b[27m"
+	if got != want {
+		t.Fatalf("Highlight = %q, want %q", got, want)
+	}
+}
+
+func TestHighlightNoMatch(t *testing.T) {
+	raw := "\x1b[1mplain\x1b[0m"
+	if got := Highlight(raw, "zebra"); got != raw {
+		t.Fatalf("Highlight = %q, want unchanged %q", got, raw)
+	}
+}
+
+func TestHighlightEmptyQuery(t *testing.T) {
+	if got := Highlight("abc", ""); got != "abc" {
+		t.Fatalf("Highlight = %q, want unchanged", got)
+	}
+}
