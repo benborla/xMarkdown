@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -45,7 +46,27 @@ type Model struct {
 	tocIdx  int
 	linkIdx int
 
+	loading   bool
+	spin      int
+	renderSeq int // tags async renders so stale results are dropped
+
 	status string
+}
+
+// renderDoneMsg carries the result of an async render.
+type renderDoneMsg struct {
+	seq   int
+	lines []string
+	index doc.Index
+	err   error
+}
+
+type spinTickMsg struct{}
+
+var spinFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+func spinTick() tea.Cmd {
+	return tea.Tick(100*time.Millisecond, func(time.Time) tea.Msg { return spinTickMsg{} })
 }
 
 func New(path string, source []byte) Model {
@@ -58,8 +79,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.reflow()
+		return m, m.startRender()
+	case renderDoneMsg:
+		if msg.seq != m.renderSeq {
+			return m, nil // stale render from before a resize
+		}
+		m.loading = false
+		if msg.err != nil {
+			m.status = "render error: " + msg.err.Error()
+			return m, nil
+		}
+		m.applyRender(msg.lines, msg.index)
 		return m, nil
+	case spinTickMsg:
+		if !m.loading {
+			return m, nil
+		}
+		m.spin++
+		return m, spinTick()
 	case tea.KeyMsg:
 		switch m.mode {
 		case modeSearchInput:
@@ -73,19 +110,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// reflow re-renders and re-indexes at the current width, preserving state
-// where possible (rerunning any active search — line numbers shift on resize).
-func (m *Model) reflow() {
+// startRender kicks off an async render at the current width and starts the
+// spinner. The seq tag lets Update drop results that a newer render obsoleted.
+func (m *Model) startRender() tea.Cmd {
 	if m.width <= 0 {
-		return
+		return nil
 	}
-	lines, err := render.Render(m.source, m.width)
-	if err != nil {
-		m.status = "render error: " + err.Error()
-		return
-	}
+	m.loading = true
+	m.renderSeq++
+	seq, src, w := m.renderSeq, m.source, m.width
+	return tea.Batch(
+		func() tea.Msg {
+			lines, err := render.Render(src, w)
+			if err != nil {
+				return renderDoneMsg{seq: seq, err: err}
+			}
+			return renderDoneMsg{seq: seq, lines: lines, index: doc.Build(src, lines)}
+		},
+		spinTick(),
+	)
+}
+
+// applyRender installs freshly rendered lines, preserving state where possible
+// (rerunning any active search — line numbers shift on resize).
+func (m *Model) applyRender(lines []string, ix doc.Index) {
 	m.lines = lines
-	m.index = doc.Build(m.source, lines)
+	m.index = ix
 	m.linkIdx = -1
 	if m.query != "" {
 		m.matches = search.Find(m.lines, m.query)
@@ -270,8 +320,8 @@ func (m Model) followLink() (tea.Model, tea.Cmd) {
 	m.query = ""
 	m.matches = nil
 	m.matchIdx = -1
-	m.reflow()
-	return m, nil
+	m.linkIdx = -1
+	return m, m.startRender()
 }
 
 func (m Model) updateSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -359,6 +409,15 @@ func (m Model) View() string {
 	if m.mode == modeTOC {
 		return m.viewTOC()
 	}
+	if m.loading && len(m.lines) == 0 {
+		// initial load: nothing to show behind the spinner yet
+		vh := m.viewHeight()
+		rows := make([]string, vh)
+		if vh > 0 {
+			rows[vh/2] = "  " + m.spinnerLabel()
+		}
+		return strings.Join(rows, "\n") + "\n" + m.statusLine()
+	}
 	vh := m.viewHeight()
 	end := m.offset + vh
 	if end > len(m.lines) {
@@ -386,9 +445,16 @@ func (m Model) View() string {
 	return strings.Join(visible, "\n") + "\n" + m.statusLine()
 }
 
+func (m Model) spinnerLabel() string {
+	return spinFrames[m.spin%len(spinFrames)] + " rendering " + m.path + "…"
+}
+
 func (m Model) statusLine() string {
 	if m.mode == modeSearchInput {
 		return "/" + m.searchInput
+	}
+	if m.loading {
+		return m.spinnerLabel()
 	}
 	pct := 100
 	if max := len(m.lines) - m.viewHeight(); max > 0 {

@@ -35,11 +35,28 @@ func key(k string) tea.KeyMsg {
 	return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
 }
 
+// run executes a command synchronously and feeds resulting messages back into
+// the model until the command chain settles, mimicking the tea runtime.
+func run(m Model, cmd tea.Cmd) Model {
+	if cmd == nil {
+		return m
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			m = run(m, c)
+		}
+		return m
+	}
+	nm, next := m.Update(msg)
+	return run(nm.(Model), next)
+}
+
 func newTestModel(t *testing.T, md string) Model {
 	t.Helper()
 	m := New("test.md", []byte(md))
-	nm, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
-	res := nm.(Model)
+	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	res := run(nm.(Model), cmd)
 	if len(res.lines) == 0 {
 		t.Fatal("reflow produced no lines")
 	}
@@ -48,8 +65,8 @@ func newTestModel(t *testing.T, md string) Model {
 
 func press(m Model, msgs ...tea.Msg) Model {
 	for _, msg := range msgs {
-		nm, _ := m.Update(msg)
-		m = nm.(Model)
+		nm, cmd := m.Update(msg)
+		m = run(nm.(Model), cmd)
 	}
 	return m
 }
@@ -357,8 +374,8 @@ func TestFollowMarkdownLinkLoadsInPlace(t *testing.T) {
 	}
 
 	m := New(mainPath, []byte(linkDoc))
-	nm, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
-	m = nm.(Model)
+	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	m = run(nm.(Model), cmd)
 	// second link is other.md
 	m = press(m, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyEnter})
 
@@ -380,13 +397,49 @@ func TestFollowMissingFileShowsError(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := New(mainPath, []byte(linkDoc))
-	nm, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
-	m = nm.(Model)
+	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	m = run(nm.(Model), cmd)
 	m = press(m, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyTab}, tea.KeyMsg{Type: tea.KeyEnter})
 	if !strings.Contains(m.statusLine(), "cannot open") {
 		t.Fatalf("status = %q, want cannot-open error", m.statusLine())
 	}
 	if m.path != mainPath {
 		t.Fatal("view should stay on original document")
+	}
+}
+
+func TestLoadingSpinnerShownUntilRenderDone(t *testing.T) {
+	m := New("test.md", []byte(longDoc))
+	nm, cmd := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	m = nm.(Model)
+	if !m.loading {
+		t.Fatal("should be loading after WindowSizeMsg")
+	}
+	if !strings.Contains(m.View(), "rendering") {
+		t.Fatalf("loading view should show rendering message:\n%s", m.View())
+	}
+	m = run(m, cmd)
+	if m.loading {
+		t.Fatal("loading should clear after render completes")
+	}
+	if len(m.lines) == 0 {
+		t.Fatal("lines should be populated after render")
+	}
+}
+
+func TestStaleRenderDropped(t *testing.T) {
+	m := New("test.md", []byte(longDoc))
+	nm, cmd1 := m.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	m = nm.(Model)
+	nm, cmd2 := m.Update(tea.WindowSizeMsg{Width: 60, Height: 10})
+	m = nm.(Model)
+	m = run(m, cmd2) // newer render lands first
+	wantLines := len(m.lines)
+	m = run(m, cmd1) // stale width-40 result must be ignored
+	if len(m.lines) != wantLines {
+		t.Fatalf("stale render applied: %d lines, want %d", len(m.lines), wantLines)
+	}
+	if m.loading {
+		t.Fatal("loading should stay cleared after stale result")
 	}
 }
