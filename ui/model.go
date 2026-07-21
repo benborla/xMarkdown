@@ -288,8 +288,11 @@ func (m Model) updateSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m, tea.Quit
 	default:
-		if msg.Type == tea.KeyRunes {
+		switch msg.Type {
+		case tea.KeyRunes:
 			m.searchInput += string(msg.Runes)
+		case tea.KeySpace:
+			m.searchInput += " "
 		}
 	}
 	return m, nil

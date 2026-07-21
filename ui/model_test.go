@@ -252,6 +252,21 @@ func TestSearchEscCancels(t *testing.T) {
 	}
 }
 
+func TestSearchInputAcceptsSpace(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("/"))
+	m = typeString(m, "first")
+	m = press(m, tea.KeyMsg{Type: tea.KeySpace, Runes: []rune{' '}})
+	m = typeString(m, "section")
+	if m.searchInput != "first section" {
+		t.Fatalf("searchInput = %q, want %q", m.searchInput, "first section")
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if len(m.matches) != 1 {
+		t.Fatalf("matches = %v, want 1 line containing %q", m.matches, "first section")
+	}
+}
+
 func TestSearchEmptyCommitIsNoop(t *testing.T) {
 	m := newTestModel(t, longDoc)
 	before := m.offset
