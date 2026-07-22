@@ -48,4 +48,4 @@ else
   esac
 fi
 
-echo "Installed $dest/$BIN"
+echo "Installed $dest/$BIN — run 'xmd --init-config' to customize"
