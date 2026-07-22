@@ -617,6 +617,44 @@ func TestCommandUnknown(t *testing.T) {
 	}
 }
 
+func TestHelpCommand(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = typeCommand(m, "help")
+	if m.mode != modeHelp {
+		t.Fatal(":help should enter help mode")
+	}
+	view := m.View()
+	for _, want := range []string{"Help", "Shortcuts", "Commands", ":theme", "ctrl+d"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("help view missing %q:\n%s", want, view)
+		}
+	}
+	m = press(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if m.mode != modeReading {
+		t.Fatal("esc should close help")
+	}
+}
+
+func TestHelpShortcutKeyAndAliases(t *testing.T) {
+	m := newTestModel(t, longDoc)
+	m = press(m, key("?"))
+	if m.mode != modeHelp {
+		t.Fatal("? should open help")
+	}
+	m = press(m, key("q"))
+	if m.mode != modeReading {
+		t.Fatal("q should close help")
+	}
+	m = typeCommand(m, "h")
+	if m.mode != modeHelp {
+		t.Fatal(":h should enter help mode")
+	}
+	m = press(m, key("?"))
+	if m.mode != modeReading {
+		t.Fatal("? should close help")
+	}
+}
+
 func TestCommandEscCancels(t *testing.T) {
 	m := newTestModel(t, longDoc)
 	m = press(m, key(":"))

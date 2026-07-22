@@ -27,6 +27,7 @@ const (
 	modeSearchInput
 	modeTOC
 	modeCommand
+	modeHelp
 )
 
 // scrolloff is the vim-style margin: the viewport scrolls once the cursor
@@ -144,6 +145,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.updateTOC(msg)
 		case modeCommand:
 			return m.updateCommand(msg)
+		case modeHelp:
+			return m.updateHelp(msg)
 		default:
 			return m.updateReading(msg)
 		}
@@ -295,6 +298,8 @@ func (m Model) updateReading(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "t":
 		m.mode = modeTOC
 		m.tocIdx = 0
+	case "?":
+		m.mode = modeHelp
 	case "tab":
 		m.cycleLink(1)
 	case "shift+tab":
@@ -524,6 +529,9 @@ func (m Model) executeCommand(input string) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 		}
+	case "help", "h":
+		m.mode = modeHelp
+		return m, nil
 	case "theme":
 		if len(fields) == 2 {
 			th, err := theme.Resolve(fields[1], m.dark)
@@ -608,7 +616,50 @@ func (m Model) cursorlineify(line string) string {
 	return s + "\x1b[0m"
 }
 
+func (m Model) updateHelp(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q", "?":
+		m.mode = modeReading
+	case "ctrl+c":
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+// helpRows pairs a shortcut line (left) with a command line (right).
+// ponytail: static table — update by hand when keys/commands change.
+var helpRows = [][2]string{
+	{"j/k ↑/↓         move cursor", ":q               quit"},
+	{"ctrl+d/u        half page", ":set nu          absolute numbers"},
+	{"ctrl+f/b space  full page", ":set rnu         relative numbers"},
+	{"gg / G          top / bottom", ":set nonu        numbers off"},
+	{"]] / [[         next/prev heading", ":theme <name>    switch theme"},
+	{"/  n  N         search, next/prev", ":help  :h        this dialog"},
+	{"t               table of contents", ""},
+	{"tab/shift+tab   cycle links", ""},
+	{"enter           follow link", ""},
+	{"esc             clear search/link", ""},
+	{"?               help", ""},
+	{"q               quit", ""},
+}
+
+func (m Model) viewHelp() string {
+	var b strings.Builder
+	accent := hexSeq(m.theme.UI.TOCSelectedFG, false)
+	b.WriteString("Help\n\n")
+	b.WriteString(fmt.Sprintf("  %s%-37s%s%s\x1b[0m\n", accent, "Shortcuts", "", "Commands"))
+	b.WriteString("\n")
+	for _, r := range helpRows {
+		b.WriteString(fmt.Sprintf("  %-37s%s\n", r[0], r[1]))
+	}
+	b.WriteString("\n[esc/q/?] close")
+	return b.String()
+}
+
 func (m Model) View() string {
+	if m.mode == modeHelp {
+		return m.viewHelp()
+	}
 	if m.mode == modeTOC {
 		return m.viewTOC()
 	}
@@ -674,7 +725,12 @@ func (m Model) statusLine() string {
 		if left == "" {
 			left = m.path
 		}
-		content = fmt.Sprintf("%s  %d%%", left, pct)
+		right := fmt.Sprintf("%d%%", pct)
+		if pad := m.width - len([]rune(left)) - len([]rune(right)); pad > 0 {
+			content = left + strings.Repeat(" ", pad) + right
+		} else {
+			content = left + "  " + right
+		}
 	}
 	if pad := m.width - len([]rune(content)); pad > 0 {
 		content += strings.Repeat(" ", pad)
