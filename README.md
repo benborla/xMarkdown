@@ -9,7 +9,16 @@ keyboard.
 
 ## Install
 
-Grab a binary from [releases](https://github.com/benborla/xMarkdown/releases), or:
+One-liner (macOS / Linux, no dependencies):
+
+```sh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/benborla/xMarkdown/main/install.sh)"
+```
+
+Downloads the latest release binary for your OS/arch and installs it to
+`/usr/local/bin` (falls back to `~/.local/bin`).
+
+Or grab a binary from [releases](https://github.com/benborla/xMarkdown/releases), or:
 
 ```sh
 go install github.com/benborla/xMarkdown@latest   # installs as `xMarkdown`
@@ -52,7 +61,8 @@ xmd README.md | less -R
 | `Tab` / `Shift-Tab` | cycle link highlight |
 | `Enter` | follow highlighted link (`.md` opens in place, URLs open in browser) |
 | `esc` | dismiss search / overlay / link highlight |
-| `:` | command mode — `:set nu`, `:set rnu`, `:set nonu`, `:theme <name>`, `:q` |
+| `?` | help — shortcuts and commands |
+| `:` | command mode — `:set nu`, `:set rnu`, `:set nonu`, `:theme <name>`, `:help`, `:q` |
 | `q` / `ctrl-c` | quit |
 
 ## Themes & config
