@@ -17,13 +17,19 @@ builds:
       - -s -w
 
 archives:
-  - formats: [tar.gz]
+  - id: tarballs
+    formats: [tar.gz]
     format_overrides:
       - goos: windows
         formats: [zip]
     files:
       - LICENSE
       - README.md
+  # Raw binaries named xmd-<os>-<arch>, fetched by install.sh from
+  # releases/latest/download/.
+  - id: raw
+    formats: [binary]
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: checksums.txt
