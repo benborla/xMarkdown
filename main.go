@@ -16,11 +16,21 @@ import (
 
 func main() {
 	themeFlag := flag.String("theme", "", "theme: auto | gruvbox-dark | gruvbox-light | <name> | <path>")
+	initConfig := flag.Bool("init-config", false, "write a starter config.yaml and exit")
 	flag.Usage = func() {
-		fmt.Fprintln(os.Stderr, "usage: xmd [--theme <theme>] <file.md>")
+		fmt.Fprintln(os.Stderr, "usage: xmd [--theme <theme>] <file.md>\n       xmd --init-config")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	if *initConfig {
+		path, err := config.Init()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "xmd:", err)
+			os.Exit(1)
+		}
+		fmt.Println("wrote", path)
+		return
+	}
 	if flag.NArg() != 1 {
 		flag.Usage()
 		os.Exit(1)

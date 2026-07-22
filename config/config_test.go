@@ -40,6 +40,34 @@ func TestLoadMalformedFallsBackWithError(t *testing.T) {
 	}
 }
 
+func TestInitWritesStarterConfig(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	path, err := Init()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != filepath.Join(Dir(), "config.yaml") {
+		t.Fatalf("path = %q", path)
+	}
+	cfg, err := loadFrom(path)
+	if err != nil {
+		t.Fatalf("starter config must parse: %v", err)
+	}
+	if cfg.Theme != "auto" || cfg.Numbers != "off" {
+		t.Fatalf("starter cfg = %+v, want auto/off", cfg)
+	}
+}
+
+func TestInitRefusesOverwrite(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if _, err := Init(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Init(); err == nil {
+		t.Fatal("second Init must not overwrite existing config")
+	}
+}
+
 func TestDirRespectsXDG(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", "/tmp/xdgtest")
 	if got := Dir(); got != "/tmp/xdgtest/xmd" {

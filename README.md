@@ -16,7 +16,11 @@ sh -c "$(curl -fsSL https://raw.githubusercontent.com/benborla/xMarkdown/main/in
 ```
 
 Downloads the latest release binary for your OS/arch and installs it to
-`/usr/local/bin` (falls back to `~/.local/bin`).
+`/usr/local/bin` (falls back to `~/.local/bin`). Uninstall:
+
+```sh
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/benborla/xMarkdown/main/uninstall.sh)"
+```
 
 Or grab a binary from [releases](https://github.com/benborla/xMarkdown/releases), or:
 
@@ -46,6 +50,15 @@ Piping works too — renders and exits, no TUI:
 xmd README.md | less -R
 ```
 
+Flags:
+
+| Flag | Effect |
+|------|--------|
+| `--theme <name\|path>` | theme override for this run |
+| `--init-config` | write a starter `~/.config/xmd/config.yaml` and exit |
+
+Press `?` inside the reader for the help dialog.
+
 ## Keys
 
 | Key | Action |
@@ -69,7 +82,8 @@ xmd README.md | less -R
 
 xmd ships gruvbox dark and light and picks one automatically from your
 terminal background. Override with `--theme gruvbox-light`, `--theme
-/path/to/theme.json`, or in `~/.config/xmd/config.yaml`:
+/path/to/theme.json`, or in `~/.config/xmd/config.yaml`
+(`xmd --init-config` writes a starter file):
 
 ```yaml
 theme: auto      # auto | gruvbox-dark | gruvbox-light | <custom-name> | /path.json

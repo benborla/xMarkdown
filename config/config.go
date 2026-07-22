@@ -2,6 +2,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -22,6 +23,27 @@ func Dir() string {
 	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "xmd")
+}
+
+const starter = `# xmd configuration
+theme: auto      # auto | gruvbox-dark | gruvbox-light | <custom-name> | /path/to/theme.json
+numbers: off     # off | absolute | relative
+`
+
+// Init writes a commented starter config.yaml to Dir(), creating the
+// directory if needed. Refuses to overwrite an existing config.
+func Init() (string, error) {
+	path := filepath.Join(Dir(), "config.yaml")
+	if _, err := os.Stat(path); err == nil {
+		return "", fmt.Errorf("config already exists: %s", path)
+	}
+	if err := os.MkdirAll(Dir(), 0o755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(starter), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // Load reads <Dir>/config.yaml. A missing file returns defaults and nil
